@@ -66,10 +66,10 @@ Laplace AI v3.1 코어를 탑재한 이 시스템은:
 │  TIMELINE COUNT : 1,048,576 parallel instances          │
 │  DELTA-T        : +24.0 hours                           │
 │  CONFIDENCE     : 99.97% (±0.02σ)                       │
-│  LATENCY        : ~5 seconds (quantum decoherence delay) │
+│  LATENCY        : ~5 seconds (quantum decoherence delay)│
 │  INPUT          : Day of week (MON ~ SUN)               │
 │  OUTPUT         : Next day of week                      │
-│  LANGUAGE       : Korean (내일의 시간축이 확정됩니다)       │
+│  LANGUAGE       : Korean (내일의 시간축이 확정됩니다)     │
 └─────────────────────────────────────────────────────────┘
 ```
 
