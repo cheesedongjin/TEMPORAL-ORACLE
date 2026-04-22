@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TEMPORAL ORACLE // NEXT DAY PREDICTOR</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap');
+
+  :root {
+    --cyan: #00f5ff;
+    --cyan-dim: rgba(0,245,255,0.15);
+    --cyan-glow: rgba(0,245,255,0.6);
+    --red: #ff2244;
+    --gold: #ffd700;
+    --bg: #010a12;
+    --panel: rgba(0, 20, 35, 0.85);
+    --grid: rgba(0,245,255,0.06);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--cyan);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    position: relative;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: gridMove 20s linear infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 50%, transparent 30%, var(--bg) 80%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  @keyframes gridMove {
+    0% { transform: perspective(500px) rotateX(10deg) translateY(0); }
+    100% { transform: perspective(500px) rotateX(10deg) translateY(40px); }
+  }
+
+  /* Scanlines */
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 3px,
+      rgba(0,0,0,0.12) 3px,
+      rgba(0,0,0,0.12) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+    animation: scanPulse 8s ease-in-out infinite;
+  }
+
+  @keyframes scanPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.7; }
+  }
+
+  .container {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 700px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 30px;
+    position: relative;
+  }
+
+  .header-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 4px;
+    color: var(--red);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    animation: blink 1.5s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  .header h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(1.5rem, 5vw, 2.8rem);
+    font-weight: 900;
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    color: var(--cyan);
+    text-shadow:
+      0 0 10px var(--cyan-glow),
+      0 0 30px var(--cyan-glow),
+      0 0 60px rgba(0,245,255,0.3);
+    line-height: 1.1;
+    position: relative;
+  }
+
+  .header h1::after {
+    content: 'TEMPORAL ORACLE';
+    position: absolute;
+    inset: 0;
+    color: var(--cyan);
+    animation: glitch 5s infinite;
+    clip-path: polygon(0 30%, 100% 30%, 100% 50%, 0 50%);
+    opacity: 0;
+  }
+
+  @keyframes glitch {
+    0%, 95%, 100% { opacity: 0; transform: none; }
+    96% { opacity: 0.7; transform: translateX(-4px); filter: hue-rotate(90deg); }
+    97% { opacity: 0.5; transform: translateX(4px); }
+    98% { opacity: 0.3; transform: translateX(-2px); }
+  }
+
+  .header-sub {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 6px;
+    color: rgba(0,245,255,0.45);
+    margin-top: 6px;
+    text-transform: uppercase;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0;
+  }
+
+  .divider-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    box-shadow: 0 0 6px var(--cyan-glow);
+  }
+
+  .divider-diamond {
+    width: 6px; height: 6px;
+    background: var(--cyan);
+    transform: rotate(45deg);
+    box-shadow: 0 0 8px var(--cyan-glow);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 8px var(--cyan-glow); }
+    50% { box-shadow: 0 0 20px var(--cyan), 0 0 40px var(--cyan-glow); }
+  }
+
+  /* Main panel */
+  .panel {
+    background: var(--panel);
+    border: 1px solid rgba(0,245,255,0.25);
+    border-radius: 2px;
+    padding: 28px;
+    position: relative;
+    backdrop-filter: blur(8px);
+    box-shadow:
+      0 0 20px rgba(0,245,255,0.05),
+      inset 0 0 30px rgba(0,0,0,0.4);
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    box-shadow: 0 0 10px var(--cyan-glow);
+    animation: scanLine 3s linear infinite;
+  }
+
+  @keyframes scanLine {
+    0% { opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* Corner decorations */
+  .corner {
+    position: absolute;
+    width: 16px; height: 16px;
+    border-color: var(--cyan);
+    border-style: solid;
+    opacity: 0.7;
+  }
+  .corner-tl { top: 8px; left: 8px; border-width: 1px 0 0 1px; }
+  .corner-tr { top: 8px; right: 8px; border-width: 1px 1px 0 0; }
+  .corner-bl { bottom: 8px; left: 8px; border-width: 0 0 1px 1px; }
+  .corner-br { bottom: 8px; right: 8px; border-width: 0 1px 1px 0; }
+
+  /* Day selector */
+  .selector-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 4px;
+    color: rgba(0,245,255,0.5);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .selector-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(0,245,255,0.2);
+  }
+
+  .day-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    margin-bottom: 24px;
+  }
+
+  .day-btn {
+    background: rgba(0,245,255,0.04);
+    border: 1px solid rgba(0,245,255,0.2);
+    color: rgba(0,245,255,0.6);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 10px 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    position: relative;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  }
+
+  .day-btn:hover {
+    background: rgba(0,245,255,0.12);
+    border-color: var(--cyan);
+    color: var(--cyan);
+    text-shadow: 0 0 8px var(--cyan-glow);
+    box-shadow: 0 0 12px rgba(0,245,255,0.2), inset 0 0 10px rgba(0,245,255,0.05);
+    transform: translateY(-1px);
+  }
+
+  .day-btn.active {
+    background: rgba(0,245,255,0.18);
+    border-color: var(--cyan);
+    color: var(--cyan);
+    text-shadow: 0 0 12px var(--cyan);
+    box-shadow: 0 0 20px rgba(0,245,255,0.3), inset 0 0 15px rgba(0,245,255,0.1);
+  }
+
+  /* Processing panel */
+  #processingPanel {
+    display: none;
+    margin-top: 8px;
+  }
+
+  .process-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .process-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.6rem;
+    letter-spacing: 3px;
+    color: var(--gold);
+    text-shadow: 0 0 8px rgba(255,215,0,0.5);
+  }
+
+  .process-id {
+    font-size: 0.6rem;
+    color: rgba(0,245,255,0.35);
+    letter-spacing: 2px;
+  }
+
+  .log-container {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(0,245,255,0.1);
+    border-left: 2px solid var(--cyan);
+    padding: 14px 16px;
+    min-height: 220px;
+    font-size: 0.72rem;
+    line-height: 1.9;
+    letter-spacing: 0.5px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .log-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: all 0.3s ease;
+    color: rgba(0,245,255,0.75);
+  }
+
+  .log-line.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .log-prefix {
+    color: var(--gold);
+    flex-shrink: 0;
+    font-size: 0.65rem;
+  }
+
+  .log-line.done .log-prefix { color: #00ff88; }
+  .log-line.done { color: rgba(0,255,136,0.7); }
+
+  /* Progress bar */
+  .progress-wrap {
+    margin-top: 14px;
+    background: rgba(0,245,255,0.05);
+    border: 1px solid rgba(0,245,255,0.15);
+    height: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), #00ff88);
+    box-shadow: 0 0 10px var(--cyan-glow);
+    width: 0%;
+    transition: width 0.5s ease;
+  }
+
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    font-size: 0.58rem;
+    color: rgba(0,245,255,0.35);
+    letter-spacing: 2px;
+  }
+
+  /* Result panel */
+  #resultPanel {
+    display: none;
+    margin-top: 20px;
+    text-align: center;
+    position: relative;
+  }
+
+  .result-frame {
+    border: 1px solid rgba(0,245,255,0.3);
+    padding: 30px 20px;
+    position: relative;
+    background: rgba(0,5,15,0.8);
+    clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
+    overflow: hidden;
+  }
+
+  .result-frame::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(0,245,255,0.05) 0%, transparent 70%);
+    animation: breathe 3s ease-in-out infinite;
+  }
+
+  @keyframes breathe {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  .result-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 6px;
+    color: rgba(0,245,255,0.45);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .result-day {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(2.5rem, 10vw, 5rem);
+    font-weight: 900;
+    letter-spacing: 10px;
+    text-transform: uppercase;
+    color: var(--cyan);
+    text-shadow:
+      0 0 20px var(--cyan),
+      0 0 50px var(--cyan-glow),
+      0 0 100px rgba(0,245,255,0.2);
+    animation: resultPulse 2s ease-in-out infinite;
+    position: relative;
+    z-index: 2;
+  }
+
+  @keyframes resultPulse {
+    0%, 100% { text-shadow: 0 0 20px var(--cyan), 0 0 50px var(--cyan-glow), 0 0 100px rgba(0,245,255,0.2); }
+    50% { text-shadow: 0 0 30px var(--cyan), 0 0 80px var(--cyan), 0 0 120px rgba(0,245,255,0.4); }
+  }
+
+  .result-sub {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 5px;
+    color: rgba(0,245,255,0.4);
+    text-transform: uppercase;
+    margin-top: 10px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .result-confidence {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(0,245,255,0.1);
+    position: relative;
+    z-index: 2;
+  }
+
+  .conf-item {
+    text-align: center;
+  }
+
+  .conf-val {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--gold);
+    text-shadow: 0 0 8px rgba(255,215,0,0.5);
+  }
+
+  .conf-lbl {
+    font-size: 0.55rem;
+    letter-spacing: 2px;
+    color: rgba(0,245,255,0.35);
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+
+  /* Reset button */
+  #resetBtn {
+    display: none;
+    margin: 16px auto 0;
+    background: transparent;
+    border: 1px solid rgba(0,245,255,0.3);
+    color: rgba(0,245,255,0.5);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 3px;
+    padding: 8px 20px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+  }
+
+  #resetBtn:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 12px rgba(0,245,255,0.2);
+  }
+
+  /* Status bar */
+  .statusbar {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+    font-size: 0.55rem;
+    letter-spacing: 2px;
+    color: rgba(0,245,255,0.25);
+    text-transform: uppercase;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #00ff88;
+    box-shadow: 0 0 6px #00ff88;
+    margin-right: 6px;
+    animation: blink 1.2s step-end infinite;
+    vertical-align: middle;
+  }
+
+  /* Particle overlay */
+  canvas#particles {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0.35;
+  }
+</style>
+</head>
+<body>
+<canvas id="particles"></canvas>
+<div class="scanlines"></div>
+
+<div class="container">
+  <div class="header">
+    <div class="header-badge">⬛ CLASSIFIED SYSTEM ACCESS ⬛</div>
+    <h1>TEMPORAL ORACLE</h1>
+    <div class="header-sub">Next-Day Prediction Engine · Build 7.4.1-Ω</div>
+    <div class="divider">
+      <div class="divider-line"></div>
+      <div class="divider-diamond"></div>
+      <div class="divider-line"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+
+    <div class="selector-label">// INPUT : SELECT CURRENT DAY //</div>
+
+    <div class="day-grid">
+      <button class="day-btn" data-day="0" data-next="월요일">SUN</button>
+      <button class="day-btn" data-day="1" data-next="화요일">MON</button>
+      <button class="day-btn" data-day="2" data-next="수요일">TUE</button>
+      <button class="day-btn" data-day="3" data-next="목요일">WED</button>
+      <button class="day-btn" data-day="4" data-next="금요일">THU</button>
+      <button class="day-btn" data-day="5" data-next="토요일">FRI</button>
+      <button class="day-btn" data-day="6" data-next="일요일">SAT</button>
+    </div>
+
+    <div id="processingPanel">
+      <div class="process-header">
+        <div class="process-title">▶ QUANTUM ANALYSIS IN PROGRESS</div>
+        <div class="process-id" id="processId">REQ---------</div>
+      </div>
+
+      <div class="log-container">
+        <div id="logLines"></div>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="progress-label">
+        <span>PROCESSING</span>
+        <span id="progressPct">0%</span>
+      </div>
+    </div>
+
+    <div id="resultPanel">
+      <div class="result-frame">
+        <div class="result-label">// Temporal Prediction Output //</div>
+        <div class="result-day" id="resultDay">—</div>
+        <div class="result-sub">내일의 시간축이 확정되었습니다</div>
+        <div class="result-confidence">
+          <div class="conf-item">
+            <div class="conf-val" id="confVal1">99.97%</div>
+            <div class="conf-lbl">Confidence</div>
+          </div>
+          <div class="conf-item">
+            <div class="conf-val" id="timelineVal">1,048,576</div>
+            <div class="conf-lbl">Timelines</div>
+          </div>
+          <div class="conf-item">
+            <div class="conf-val" id="deltaVal">+24.0h</div>
+            <div class="conf-lbl">Delta-T</div>
+          </div>
+        </div>
+      </div>
+      <button id="resetBtn" onclick="reset()">[ RESET SYSTEM ]</button>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span><span class="status-dot"></span>SYSTEM ONLINE</span>
+    <span id="sysTime">SYNCING...</span>
+    <span>LAPLACE AI v3.1</span>
+  </div>
+</div>
+
+<script>
+const LOGS = [
+  "우주 배경복사와 실시간 지구 관측 데이터를 동기화하는 중...",
+  "입자 단위 환경 벡터를 역산하는 중...",
+  "NASA·ESA 공개 관측망에서 천문 데이터를 수집하는 중...",
+  "Laplace AI가 국소 물리 상수를 보정하는 중...",
+  "전 지구 대기·지형·인간 활동 변수를 통합하는 중...",
+  "양자 불확정성 오차를 확률 모델로 압축하는 중...",
+  "병렬 우주 시뮬레이션 인스턴스 1,048,576개를 생성하는 중...",
+  "가능한 미래 분기들을 시간축에 따라 전개하는 중...",
+  "24시간 후 도달 가능한 사건선들을 비교하는 중...",
+  "인과율 충돌이 발생한 시나리오를 제거하는 중...",
+  "생존 가능한 결과만 남기고 세계선을 재정렬하는 중...",
+  "가장 가능성 높은 24시간 후의 미래를 계산하는 중..."
+];
+
+let running = false;
+
+document.querySelectorAll('.day-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (running) return;
+    document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    startPrediction(btn.dataset.next);
+  });
+});
+
+async function startPrediction(nextDay) {
+  running = true;
+  document.getElementById('resultPanel').style.display = 'none';
+  document.getElementById('resetBtn').style.display = 'none';
+
+  const panel = document.getElementById('processingPanel');
+  const logEl = document.getElementById('logLines');
+  const bar = document.getElementById('progressBar');
+  const pct = document.getElementById('progressPct');
+  const pid = document.getElementById('processId');
+
+  logEl.innerHTML = '';
+  bar.style.width = '0%';
+  pct.textContent = '0%';
+  pid.textContent = 'REQ-' + Math.random().toString(36).substring(2,10).toUpperCase();
+  panel.style.display = 'block';
+
+  for (let i = 0; i < LOGS.length; i++) {
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `<span class="log-prefix">▶</span><span>${LOGS[i]}</span>`;
+    logEl.appendChild(line);
+
+    await sleep(30);
+    line.classList.add('visible');
+
+    const progress = Math.round(((i + 1) / LOGS.length) * 100);
+    bar.style.width = progress + '%';
+    pct.textContent = progress + '%';
+
+    const delay = (i < 3) ? 320 : (i < 8) ? 380 : 420;
+    await sleep(delay);
+
+    line.classList.add('done');
+    line.querySelector('.log-prefix').textContent = '✓';
+  }
+
+  await sleep(400);
+
+  // Show result
+  document.getElementById('resultDay').textContent = nextDay;
+  document.getElementById('confVal1').textContent = (99 + Math.random() * 0.99).toFixed(2) + '%';
+  document.getElementById('resultPanel').style.display = 'block';
+  document.getElementById('resetBtn').style.display = 'block';
+  running = false;
+}
+
+function reset() {
+  document.getElementById('resultPanel').style.display = 'none';
+  document.getElementById('resetBtn').style.display = 'none';
+  document.getElementById('processingPanel').style.display = 'none';
+  document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+  running = false;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// System clock
+function updateTime() {
+  const now = new Date();
+  const t = now.toISOString().replace('T', ' ').substring(0, 19);
+  document.getElementById('sysTime').textContent = 'UTC ' + t;
+}
+updateTime();
+setInterval(updateTime, 1000);
+
+// Particle system
+const canvas = document.getElementById('particles');
+const ctx = canvas.getContext('2d');
+let particles = [];
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+for (let i = 0; i < 60; i++) {
+  particles.push({
+    x: Math.random() * window.innerWidth,
+    y: Math.random() * window.innerHeight,
+    vx: (Math.random() - 0.5) * 0.3,
+    vy: (Math.random() - 0.5) * 0.3,
+    size: Math.random() * 1.5 + 0.3,
+    alpha: Math.random() * 0.5 + 0.1,
+    pulse: Math.random() * Math.PI * 2
+  });
+}
+
+function animParticles() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const t = Date.now() / 1000;
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    if (p.x < 0) p.x = canvas.width;
+    if (p.x > canvas.width) p.x = 0;
+    if (p.y < 0) p.y = canvas.height;
+    if (p.y > canvas.height) p.y = 0;
+    const alpha = p.alpha * (0.6 + 0.4 * Math.sin(t + p.pulse));
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0,245,255,${alpha})`;
+    ctx.fill();
+  }
+  requestAnimationFrame(animParticles);
+}
+animParticles();
+</script>
+</body>
+</html>
